@@ -1,8 +1,9 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "strava-mcp",
+  "compatibility_date": "2026-04-22",
   "main": "src/index.ts",
-  "compatibility_date": "2026-04-22"
+  "minify": true,
   // "compatibility_flags": [
   //   "nodejs_compat"
   // ],
