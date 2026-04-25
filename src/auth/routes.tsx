@@ -1,19 +1,20 @@
 import { Hono } from 'hono';
 import type { Env, StravaTokenResponse, StravaTokenError } from '../types';
 import { storeTokens, getStoredTokens, isTokenExpired } from './token';
+import { SuccessPage } from './pages/SuccessPage';
+import { ErrorPage } from './pages/ErrorPage';
 
 const STRAVA_AUTH_URL = 'https://www.strava.com/oauth/authorize';
 const STRAVA_TOKEN_URL = 'https://www.strava.com/oauth/token';
 const SCOPES = 'read,activity:read_all,profile:read_all';
 const STATE_KV_PREFIX = 'oauth:state:';
-const STATE_TTL_SECONDS = 600; // state nonce expires in 10 minutes
+const STATE_TTL_SECONDS = 600;
 
 export const authRoutes = new Hono<Env>();
 
 authRoutes.get('/strava', async (c) => {
   const { STRAVA_CLIENT_ID, REDIRECT_URI, STRAVA_KV } = c.env;
 
-  // Generate a random state nonce to prevent CSRF attacks
   const state = crypto.randomUUID();
   await STRAVA_KV.put(`${STATE_KV_PREFIX}${state}`, '1', {
     expirationTtl: STATE_TTL_SECONDS,
@@ -39,20 +40,20 @@ authRoutes.get('/callback', async (c) => {
   const state = c.req.query('state');
 
   if (error) {
-    return c.json({ error: `Strava authorization denied: ${error}` }, 400);
+    return c.html(<ErrorPage message={`Strava authorization denied: ${error}`} />, 400);
   }
 
   if (!code) {
-    return c.json({ error: 'Missing authorization code' }, 400);
+    return c.html(<ErrorPage message="Missing authorization code." />, 400);
   }
 
-  // Validate the state nonce to prevent CSRF
   if (!state) {
-    return c.json({ error: 'Missing state parameter' }, 400);
+    return c.html(<ErrorPage message="Missing state parameter." />, 400);
   }
+
   const storedState = await STRAVA_KV.get(`${STATE_KV_PREFIX}${state}`);
   if (!storedState) {
-    return c.json({ error: 'Invalid or expired state parameter' }, 400);
+    return c.html(<ErrorPage message="Invalid or expired state. Please try authenticating again." />, 400);
   }
   await STRAVA_KV.delete(`${STATE_KV_PREFIX}${state}`);
 
@@ -72,17 +73,15 @@ authRoutes.get('/callback', async (c) => {
 
   if (!tokenResponse.ok) {
     const err = (await tokenResponse.json()) as StravaTokenError;
-    return c.json({ error: `Token exchange failed: ${err.message}` }, 502);
+    return c.html(<ErrorPage message={`Token exchange failed: ${err.message}`} />, 502);
   }
 
   const data = (await tokenResponse.json()) as StravaTokenResponse;
   await storeTokens(STRAVA_KV, data);
 
-  return c.json({
-    success: true,
-    athlete: data.athlete,
-    expires_at: data.expires_at,
-  });
+  return c.html(
+    <SuccessPage athlete={data.athlete ?? { id: 0, username: '', firstname: 'Athlete', lastname: '' }} />
+  );
 });
 
 authRoutes.get('/status', async (c) => {
