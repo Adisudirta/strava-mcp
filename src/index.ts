@@ -1,10 +1,18 @@
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
 import type { Env } from './types';
 import { authRoutes } from './auth/routes';
 import { wellKnownRoutes, oauthRoutes } from './auth/oauth';
 import { mcpServer, mcpTransport, setMcpContext } from './mcp/server';
 
 const app = new Hono<Env>();
+
+app.use('*', cors({
+  origin: '*',
+  allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization', 'Mcp-Session-Id'],
+  exposeHeaders: ['WWW-Authenticate', 'Mcp-Session-Id'],
+}));
 
 app.get('/', (c) => c.text('Strava MCP Server'));
 
