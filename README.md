@@ -25,7 +25,7 @@ npm install
 ### 2. Create a Strava API application
 
 1. Go to [strava.com/settings/api](https://www.strava.com/settings/api)
-2. Fill in the form — the **Authorization Callback Domain** must be:
+2. Fill in the form, the **Authorization Callback Domain** must be:
    - `localhost` for local development
    - Your workers subdomain (e.g. `strava-mcp.yourname.workers.dev`) for production
 3. Copy your **Client ID** and **Client Secret**
@@ -80,7 +80,7 @@ npx wrangler secret put STRAVA_CLIENT_ID
 npx wrangler secret put STRAVA_CLIENT_SECRET
 ```
 
-You will be prompted to enter the values — they are stored encrypted in Cloudflare and never in source code.
+You will be prompted to enter the values, they are stored encrypted in Cloudflare and never in source code.
 
 ---
 
@@ -98,7 +98,11 @@ The server starts at `http://localhost:8787`.
 2. Authorize the app on Strava
 3. You will be redirected back with a success response:
    ```json
-   { "success": true, "athlete": { "id": 123, "firstname": "..." }, "expires_at": 1234567890 }
+   {
+     "success": true,
+     "athlete": { "id": 123, "firstname": "..." },
+     "expires_at": 1234567890
+   }
    ```
 4. Check token status at `http://localhost:8787/auth/status`
 
@@ -123,53 +127,19 @@ Set the `CLOUDFLARE_API_TOKEN` secret in your GitHub repository settings for the
 
 ## Environment variables
 
-| Variable | Where to set | Description |
-|---|---|---|
-| `REDIRECT_URI` | `wrangler.jsonc` (prod), `.dev.vars` (local) | OAuth callback URL |
-| `STRAVA_CLIENT_ID` | `wrangler secret put` (prod), `.dev.vars` (local) | Strava API client ID |
+| Variable               | Where to set                                      | Description              |
+| ---------------------- | ------------------------------------------------- | ------------------------ |
+| `REDIRECT_URI`         | `wrangler.jsonc` (prod), `.dev.vars` (local)      | OAuth callback URL       |
+| `STRAVA_CLIENT_ID`     | `wrangler secret put` (prod), `.dev.vars` (local) | Strava API client ID     |
 | `STRAVA_CLIENT_SECRET` | `wrangler secret put` (prod), `.dev.vars` (local) | Strava API client secret |
-
----
-
-## API reference
-
-### `GET /auth/strava`
-
-Redirects the user to Strava's OAuth authorization page.
-
-### `GET /auth/callback`
-
-Handles the OAuth callback from Strava. Exchanges the authorization code for tokens and stores them in KV. Returns:
-
-```json
-{
-  "success": true,
-  "athlete": { "id": 123, "username": "...", "firstname": "...", "lastname": "..." },
-  "expires_at": 1234567890
-}
-```
-
-### `GET /auth/status`
-
-Returns the current authentication state without triggering a token refresh.
-
-```json
-{
-  "authenticated": true,
-  "expired": false,
-  "expires_at": 1234567890,
-  "expires_in_seconds": 18000,
-  "athlete": { "id": 123, "username": "...", "firstname": "...", "lastname": "..." }
-}
-```
 
 ---
 
 ## Security
 
-- **CSRF protection** — each authorization request generates a one-time `state` nonce stored in KV with a 10-minute TTL. The callback validates and immediately deletes it before exchanging the code.
-- **Secrets** — `STRAVA_CLIENT_ID` and `STRAVA_CLIENT_SECRET` are stored as encrypted Cloudflare Worker secrets, never in source code or `wrangler.jsonc`.
-- **Token storage** — access and refresh tokens are stored in Cloudflare KV (not exposed via any public endpoint).
+- **CSRF protection**: each authorization request generates a one-time `state` nonce stored in KV with a 10-minute TTL. The callback validates and immediately deletes it before exchanging the code.
+- **Secrets**: `STRAVA_CLIENT_ID` and `STRAVA_CLIENT_SECRET` are stored as encrypted Cloudflare Worker secrets, never in source code or `wrangler.jsonc`.
+- **Token storage**: access and refresh tokens are stored in Cloudflare KV (not exposed via any public endpoint).
 
 ---
 
