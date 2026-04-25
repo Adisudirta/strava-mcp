@@ -13,6 +13,7 @@ const REDIRECT_URI = `http://localhost:${CALLBACK_PORT}/callback`;
 const TOKEN_DIR = path.join(os.homedir(), '.strava-mcp');
 const TOKEN_FILE = path.join(TOKEN_DIR, 'tokens.json');
 const EXPIRY_BUFFER_SECONDS = 300;
+const AUTH_TIMEOUT_MS = 10 * 60 * 1000;
 
 export interface Athlete {
   id: number;
@@ -28,6 +29,9 @@ interface TokenRecord {
   athlete: Athlete;
 }
 
+// Keeps the background callback server alive between tool calls
+let pendingServer: http.Server | null = null;
+
 export function loadTokens(): TokenRecord | null {
   try {
     return JSON.parse(fs.readFileSync(TOKEN_FILE, 'utf-8'));
@@ -38,11 +42,12 @@ export function loadTokens(): TokenRecord | null {
 
 function saveTokens(record: TokenRecord): void {
   fs.mkdirSync(TOKEN_DIR, { recursive: true });
-  // mode 0o600 = owner read/write only — protects the secret tokens
   fs.writeFileSync(TOKEN_FILE, JSON.stringify(record, null, 2), { mode: 0o600 });
 }
 
 export function clearTokens(): void {
+  pendingServer?.close();
+  pendingServer = null;
   try { fs.unlinkSync(TOKEN_FILE); } catch { /* already gone */ }
 }
 
@@ -92,7 +97,7 @@ function openBrowser(url: string): void {
     : process.platform === 'win32' ? `start "" "${url}"`
     : `xdg-open "${url}"`;
   exec(cmd, (err) => {
-    if (err) process.stderr.write(`Browser could not be opened automatically. Visit:\n${url}\n`);
+    if (err) process.stderr.write(`Could not open browser automatically.\n`);
   });
 }
 
@@ -102,7 +107,15 @@ function callbackHtml(title: string, body: string): string {
 </head><body><div><h1>${title}</h1><p>${body}</p></div></body></html>`;
 }
 
-export function startOAuthFlow(clientId: string, clientSecret: string): Promise<TokenRecord> {
+/**
+ * Starts the OAuth flow. Returns the authorization URL immediately and
+ * handles the callback in the background — no blocking.
+ */
+export function startOAuthFlow(clientId: string, clientSecret: string): Promise<string> {
+  // Clean up any previously pending auth server
+  pendingServer?.close();
+  pendingServer = null;
+
   return new Promise((resolve, reject) => {
     const state = crypto.randomBytes(16).toString('hex');
 
@@ -127,17 +140,16 @@ export function startOAuthFlow(clientId: string, clientSecret: string): Promise<
         res.writeHead(status, { 'Content-Type': 'text/html' });
         res.end(callbackHtml(title, body));
         server.close();
+        pendingServer = null;
       };
 
       if (error) {
-        send(400, 'Authorization Denied', 'You can close this window.');
-        reject(new Error(`Strava authorization denied: ${error}`));
+        send(400, 'Authorization Denied', 'You can close this window and return to Claude.');
         return;
       }
 
       if (returnedState !== state || !code) {
-        send(400, 'Invalid Response', 'You can close this window.');
-        reject(new Error('OAuth state mismatch — possible CSRF. Try again.'));
+        send(400, 'Invalid Response', 'State mismatch — try connect_strava again.');
         return;
       }
 
@@ -160,20 +172,17 @@ export function startOAuthFlow(clientId: string, clientSecret: string): Promise<
         }
 
         const data = await tokenRes.json() as TokenRecord & { athlete: Athlete };
-        const record: TokenRecord = {
+        saveTokens({
           access_token: data.access_token,
           refresh_token: data.refresh_token,
           expires_at: data.expires_at,
           athlete: data.athlete,
-        };
-        saveTokens(record);
+        });
 
         send(200, 'Connected to Strava!',
-          `Welcome, ${record.athlete.firstname}! You can close this window and return to Claude.`);
-        resolve(record);
+          `Welcome, ${data.athlete.firstname}! You can close this window and return to Claude.`);
       } catch (err) {
-        send(500, 'Something went wrong', 'You can close this window.');
-        reject(err);
+        send(500, 'Something went wrong', 'You can close this window and try again.');
       }
     });
 
@@ -184,11 +193,18 @@ export function startOAuthFlow(clientId: string, clientSecret: string): Promise<
       reject(new Error(msg));
     });
 
-    server.listen(CALLBACK_PORT, () => openBrowser(authUrl));
+    server.listen(CALLBACK_PORT, () => {
+      pendingServer = server;
+      openBrowser(authUrl);
+      resolve(authUrl);
+    });
 
+    // Auto-cleanup after timeout
     setTimeout(() => {
-      server.close();
-      reject(new Error('Authentication timed out after 5 minutes.'));
-    }, 5 * 60 * 1000);
+      if (pendingServer === server) {
+        server.close();
+        pendingServer = null;
+      }
+    }, AUTH_TIMEOUT_MS);
   });
 }
