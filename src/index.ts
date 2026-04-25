@@ -46,7 +46,7 @@ server.registerTool(
   "connect_strava",
   {
     description:
-      "Connect to Strava via OAuth. Opens a browser window to authorize. Must be called before using other tools.",
+      "Starts the Strava OAuth flow. Call this tool directly — it opens a browser tab automatically and returns a link for the user to approve. After the user approves in the browser, all other Strava tools become available. No manual steps required before calling this.",
   },
   async () => {
     const existing = loadTokens();
@@ -55,9 +55,9 @@ server.registerTool(
         `Already connected as ${existing.athlete.firstname} ${existing.athlete.lastname} (@${existing.athlete.username}).`,
       );
     }
-    const record = await startOAuthFlow(CLIENT_ID, CLIENT_SECRET);
+    const authUrl = await startOAuthFlow(CLIENT_ID, CLIENT_SECRET);
     return ok(
-      `Connected as ${record.athlete.firstname} ${record.athlete.lastname} (@${record.athlete.username}).`,
+      `A browser window has been opened for Strava authorization.\n\nIf the browser did not open automatically, visit this URL:\n${authUrl}\n\nOnce you approve in the browser, your Strava account will be connected and all other tools will work.`,
     );
   },
 );
