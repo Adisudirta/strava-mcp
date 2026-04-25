@@ -50,15 +50,24 @@ export const mcpServer = new McpServer({ name: 'strava-mcp', version: '1.0.0' })
 export const mcpTransport = new StreamableHTTPTransport();
 
 mcpServer.registerTool(
-  'get_auth_url',
+  'check_strava_connection',
   {
-    description: 'Get the URL to authenticate with Strava. Call this first if not authenticated — the user must open the URL in their browser.',
+    description: 'Check whether the user is authenticated with Strava. Always call this first before using any other Strava tool. If not connected, it returns the URL the user must open in their browser to authenticate.',
     inputSchema: {},
   },
   async () => {
+    const token = await requireToken();
+    if (token) {
+      const data = await stravaFetch('/athlete', token) as { firstname?: string; lastname?: string };
+      const name = [data.firstname, data.lastname].filter(Boolean).join(' ') || 'Athlete';
+      return {
+        content: [{ type: 'text', text: `Connected to Strava as ${name}. You can now use Strava tools.` }],
+      };
+    }
     const authUrl = ctx?.redirectUri.replace('/auth/callback', '/auth/strava') ?? '/auth/strava';
     return {
-      content: [{ type: 'text', text: `To use Strava tools, open this URL in your browser:\n\n${authUrl}` }],
+      isError: true,
+      content: [{ type: 'text', text: `Not connected to Strava. Ask the user to open this URL in their browser to authenticate:\n\n${authUrl}` }],
     };
   }
 );
@@ -81,7 +90,7 @@ mcpServer.registerTool(
 mcpServer.registerTool(
   'get_athlete',
   {
-    description: 'Get the authenticated athlete\'s profile information',
+    description: 'Get the authenticated athlete\'s profile information. Call check_strava_connection first to verify authentication.',
     inputSchema: {},
   },
   async () => {
@@ -95,7 +104,7 @@ mcpServer.registerTool(
 mcpServer.registerTool(
   'list_activities',
   {
-    description: 'List the authenticated athlete\'s recent activities',
+    description: 'List the authenticated athlete\'s recent activities. Call check_strava_connection first to verify authentication.',
     inputSchema: {
       per_page: z.number().min(1).max(200).default(30).describe('Number of activities per page'),
       page: z.number().min(1).default(1).describe('Page number'),
@@ -120,7 +129,7 @@ mcpServer.registerTool(
 mcpServer.registerTool(
   'get_activity',
   {
-    description: 'Get details of a specific activity by ID',
+    description: 'Get details of a specific activity by ID. Call check_strava_connection first to verify authentication.',
     inputSchema: {
       id: z.number().describe('The activity ID'),
     },
