@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { deleteTokens } from '../auth/token';
 
 const STRAVA_API = 'https://www.strava.com/api/v3';
 
@@ -36,11 +37,25 @@ export function createUnauthenticatedMcpServer(redirectUri: string): McpServer {
   return server;
 }
 
-export function createMcpServer(token: string): McpServer {
+export function createMcpServer(token: string, sessionId: string, kv: KVNamespace): McpServer {
   const server = new McpServer({
     name: 'strava-mcp',
     version: '1.0.0',
   });
+
+  server.registerTool(
+    'logout',
+    {
+      description: 'Revoke the current session and disconnect from Strava. The user will need to re-authenticate to use Strava tools again.',
+      inputSchema: {},
+    },
+    async () => {
+      await deleteTokens(kv, sessionId);
+      return {
+        content: [{ type: 'text', text: 'You have been logged out. Visit /auth/strava to reconnect your Strava account.' }],
+      };
+    }
+  );
 
   server.registerTool(
     'get_athlete',
