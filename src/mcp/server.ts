@@ -21,7 +21,8 @@ export function setMcpContext(context: McpContext) {
 }
 
 const NOT_AUTHENTICATED = {
-  content: [{ type: 'text' as const, text: 'Not authenticated. Call get_auth_url to get the link to connect your Strava account.' }],
+  isError: true,
+  content: [{ type: 'text' as const, text: 'Not authenticated. Call the get_auth_url tool to get the Strava login URL, then ask the user to open it in their browser.' }],
 };
 
 async function requireToken(): Promise<string | null> {
