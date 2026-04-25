@@ -1,3 +1,4 @@
+import { raw } from 'hono/html';
 import type { StravaAthlete } from '../../types';
 
 export const SuccessPage = ({ athlete }: { athlete: StravaAthlete }) => (
@@ -6,10 +7,13 @@ export const SuccessPage = ({ athlete }: { athlete: StravaAthlete }) => (
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <title>Strava MCP — Connected</title>
-      <style>{`
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+      <style>{raw(`
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          font-family: 'Inter', sans-serif;
           background: #f5f5f5;
           min-height: 100vh;
           display: flex;
@@ -47,7 +51,7 @@ export const SuccessPage = ({ athlete }: { athlete: StravaAthlete }) => (
           font-size: 0.85rem;
           color: #888;
         }
-      `}</style>
+      `)}</style>
     </head>
     <body>
       <div class="card">

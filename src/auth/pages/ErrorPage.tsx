@@ -1,13 +1,18 @@
+import { raw } from 'hono/html';
+
 export const ErrorPage = ({ message }: { message: string }) => (
   <html lang="en">
     <head>
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <title>Strava MCP — Error</title>
-      <style>{`
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+      <style>{raw(`
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          font-family: 'Inter', sans-serif;
           background: #f5f5f5;
           min-height: 100vh;
           display: flex;
@@ -46,7 +51,7 @@ export const ErrorPage = ({ message }: { message: string }) => (
           color: #ef4444;
           word-break: break-word;
         }
-      `}</style>
+      `)}</style>
     </head>
     <body>
       <div class="card">
