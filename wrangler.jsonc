@@ -1,18 +1,19 @@
 {
-	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "strava-mcp",
-	"compatibility_date": "2026-04-22",
-	"main": "src/index.ts",
-	"minify": true,
-	"vars": {
-		// Override this in .dev.vars for local dev: REDIRECT_URI=http://localhost:8787/auth/callback
-		"REDIRECT_URI": "https://strava-mcp.workers.dev/auth/callback"
-	},
-	"kv_namespaces": [
-		{
-			"binding": "STRAVA_KV",
-			"id": "c2be110f2c85490f9f77ae407310411c",
-			"remote": true
-		}
-	]
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "strava-mcp",
+  "compatibility_date": "2026-04-22",
+  "main": "src/index.ts",
+  "minify": true,
+  "vars": {
+    // Override in .dev.vars for local dev: REDIRECT_URI=http://localhost:8787/auth/callback
+    // Replace with your own workers.dev subdomain after running: npx wrangler deploy
+    "REDIRECT_URI": "https://strava-mcp.<your-subdomain>.workers.dev/auth/callback"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "STRAVA_KV",
+      // Run: npx wrangler kv namespace create STRAVA_KV — then paste the printed id here
+      "id": "<your-kv-namespace-id>"
+    }
+  ]
 }
