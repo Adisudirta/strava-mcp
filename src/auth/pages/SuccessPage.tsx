@@ -1,7 +1,13 @@
 import { raw } from 'hono/html';
 import type { StravaAthlete } from '../../types';
 
-export const SuccessPage = ({ athlete }: { athlete: StravaAthlete }) => (
+type Props = {
+  athlete: StravaAthlete;
+  sessionToken: string;
+  mcpUrl: string;
+};
+
+export const SuccessPage = ({ athlete, sessionToken, mcpUrl }: Props) => (
   <html lang="en">
     <head>
       <meta charset="UTF-8" />
@@ -25,7 +31,7 @@ export const SuccessPage = ({ athlete }: { athlete: StravaAthlete }) => (
           background: white;
           border-radius: 16px;
           padding: 2.5rem 2rem;
-          max-width: 400px;
+          max-width: 480px;
           width: 100%;
           text-align: center;
           box-shadow: 0 4px 24px rgba(0,0,0,0.08);
@@ -43,6 +49,53 @@ export const SuccessPage = ({ athlete }: { athlete: StravaAthlete }) => (
         h1 { font-size: 1.5rem; font-weight: 700; color: #111; margin-bottom: 0.5rem; }
         .name { font-size: 1.1rem; color: #FC4C02; font-weight: 600; margin-bottom: 1rem; }
         p { color: #666; font-size: 0.95rem; line-height: 1.5; }
+        .section {
+          margin-top: 1.5rem;
+          text-align: left;
+        }
+        .section-label {
+          font-size: 0.78rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          color: #999;
+          margin-bottom: 0.5rem;
+        }
+        .token-box {
+          background: #f5f5f5;
+          border-radius: 8px;
+          padding: 0.75rem 1rem;
+          font-family: monospace;
+          font-size: 0.82rem;
+          color: #111;
+          word-break: break-all;
+          position: relative;
+        }
+        .copy-btn {
+          margin-top: 0.5rem;
+          width: 100%;
+          padding: 0.5rem;
+          background: #FC4C02;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          font-size: 0.85rem;
+          font-weight: 600;
+          cursor: pointer;
+          font-family: 'Inter', sans-serif;
+        }
+        .copy-btn:hover { background: #e04300; }
+        .config-box {
+          background: #1a1a1a;
+          border-radius: 8px;
+          padding: 0.75rem 1rem;
+          font-family: monospace;
+          font-size: 0.78rem;
+          color: #e5e5e5;
+          text-align: left;
+          white-space: pre-wrap;
+          word-break: break-all;
+        }
         .hint {
           margin-top: 1.5rem;
           padding: 0.75rem 1rem;
@@ -50,6 +103,7 @@ export const SuccessPage = ({ athlete }: { athlete: StravaAthlete }) => (
           border-radius: 8px;
           font-size: 0.85rem;
           color: #888;
+          text-align: center;
         }
       `)}</style>
     </head>
@@ -62,8 +116,31 @@ export const SuccessPage = ({ athlete }: { athlete: StravaAthlete }) => (
         </div>
         <h1>Connected to Strava</h1>
         <p class="name">{athlete.firstname} {athlete.lastname}</p>
-        <p>Your Strava account has been successfully linked. You can now use the Strava MCP tools in Claude.</p>
-        <p class="hint">You can close this tab and return to your conversation.</p>
+        <p>Your session token is unique to this device. Add it to your MCP config below.</p>
+
+        <div class="section">
+          <p class="section-label">Your Session Token</p>
+          <div class="token-box" id="token">{sessionToken}</div>
+          <button class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById('token').innerText).then(()=>this.textContent='Copied!')">
+            Copy Token
+          </button>
+        </div>
+
+        <div class="section">
+          <p class="section-label">Claude Desktop Config</p>
+          <div class="config-box">{`{
+  "mcpServers": {
+    "strava": {
+      "url": "${mcpUrl}",
+      "headers": {
+        "Authorization": "Bearer ${sessionToken}"
+      }
+    }
+  }
+}`}</div>
+        </div>
+
+        <p class="hint">Each device or Claude instance should authenticate separately to get its own token.</p>
       </div>
     </body>
   </html>

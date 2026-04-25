@@ -1,17 +1,20 @@
 import type { StravaTokenRecord, StravaTokenResponse, StravaTokenError } from '../types';
 
-const KV_TOKEN_KEY = 'strava:tokens';
 const TOKEN_EXPIRY_BUFFER_SECONDS = 300;
 
+const sessionKey = (sessionId: string) => `session:${sessionId}:tokens`;
+
 export async function getStoredTokens(
-  kv: KVNamespace
+  kv: KVNamespace,
+  sessionId: string
 ): Promise<StravaTokenRecord | null> {
-  const raw = await kv.get(KV_TOKEN_KEY, 'json');
+  const raw = await kv.get(sessionKey(sessionId), 'json');
   return (raw as StravaTokenRecord) ?? null;
 }
 
 export async function storeTokens(
   kv: KVNamespace,
+  sessionId: string,
   tokenResponse: StravaTokenResponse
 ): Promise<void> {
   const record: StravaTokenRecord = {
@@ -21,7 +24,11 @@ export async function storeTokens(
     token_type: tokenResponse.token_type,
     athlete: tokenResponse.athlete ?? { id: 0, username: '', firstname: '', lastname: '' },
   };
-  await kv.put(KV_TOKEN_KEY, JSON.stringify(record));
+  await kv.put(sessionKey(sessionId), JSON.stringify(record));
+}
+
+export async function deleteTokens(kv: KVNamespace, sessionId: string): Promise<void> {
+  await kv.delete(sessionKey(sessionId));
 }
 
 export function isTokenExpired(record: StravaTokenRecord): boolean {
@@ -31,6 +38,7 @@ export function isTokenExpired(record: StravaTokenRecord): boolean {
 
 export async function refreshAccessToken(
   kv: KVNamespace,
+  sessionId: string,
   clientId: string,
   clientSecret: string,
   refreshToken: string
@@ -54,20 +62,21 @@ export async function refreshAccessToken(
   }
 
   const data = (await response.json()) as StravaTokenResponse;
-  await storeTokens(kv, data);
-  return (await getStoredTokens(kv))!;
+  await storeTokens(kv, sessionId, data);
+  return (await getStoredTokens(kv, sessionId))!;
 }
 
 export async function getValidAccessToken(
   kv: KVNamespace,
+  sessionId: string,
   clientId: string,
   clientSecret: string
 ): Promise<string | null> {
-  const record = await getStoredTokens(kv);
+  const record = await getStoredTokens(kv, sessionId);
   if (!record) return null;
 
   if (isTokenExpired(record)) {
-    const refreshed = await refreshAccessToken(kv, clientId, clientSecret, record.refresh_token);
+    const refreshed = await refreshAccessToken(kv, sessionId, clientId, clientSecret, record.refresh_token);
     return refreshed.access_token;
   }
 
