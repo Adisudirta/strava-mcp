@@ -64,10 +64,9 @@ mcpServer.registerTool(
         content: [{ type: 'text', text: `Connected to Strava as ${name}. You can now use Strava tools.` }],
       };
     }
-    const authUrl = ctx?.redirectUri.replace('/auth/callback', '/auth/strava') ?? '/auth/strava';
     return {
       isError: true,
-      content: [{ type: 'text', text: `Not connected to Strava. Ask the user to open this URL in their browser to authenticate:\n\n${authUrl}` }],
+      content: [{ type: 'text', text: 'Not connected to Strava. Please reconnect this MCP server in Claude\'s settings to start the Strava login flow.' }],
     };
   }
 );
