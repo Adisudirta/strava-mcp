@@ -1,16 +1,46 @@
 import { Hono } from 'hono';
 import type { Env, StravaTokenResponse, StravaTokenError } from '../types';
 import { storeTokens, getStoredTokens, isTokenExpired, deleteTokens } from './token';
+import { ConnectPage } from './pages/ConnectPage';
+import { SuccessPage } from './pages/SuccessPage';
 import { ErrorPage } from './pages/ErrorPage';
-import { MCP_PENDING_PREFIX, MCP_CODE_PREFIX, CODE_TTL, STATE_KV_PREFIX } from './oauth';
-import type { McpPendingRecord, McpCodeRecord } from './oauth';
+import { encryptSessionId } from './crypto';
 
+const STRAVA_AUTH_URL = 'https://www.strava.com/oauth/authorize';
 const STRAVA_TOKEN_URL = 'https://www.strava.com/oauth/token';
+const SCOPES = 'read,activity:read_all,profile:read_all';
+const STATE_KV_PREFIX = 'oauth:state:';
+const STATE_TTL_SECONDS = 600;
 
 export const authRoutes = new Hono<Env>();
 
+authRoutes.get('/connect', (c) => {
+  const origin = new URL(c.req.url).origin;
+  return c.html(<ConnectPage authUrl={`${origin}/auth/strava`} />);
+});
+
+authRoutes.get('/strava', async (c) => {
+  const { STRAVA_CLIENT_ID, REDIRECT_URI, STRAVA_KV } = c.env;
+
+  const state = crypto.randomUUID();
+  await STRAVA_KV.put(`${STATE_KV_PREFIX}${state}`, '1', {
+    expirationTtl: STATE_TTL_SECONDS,
+  });
+
+  const params = new URLSearchParams({
+    client_id: STRAVA_CLIENT_ID,
+    redirect_uri: REDIRECT_URI,
+    response_type: 'code',
+    approval_prompt: 'auto',
+    scope: SCOPES,
+    state,
+  });
+
+  return c.redirect(`${STRAVA_AUTH_URL}?${params.toString()}`);
+});
+
 authRoutes.get('/callback', async (c) => {
-  const { STRAVA_CLIENT_ID, STRAVA_CLIENT_SECRET, REDIRECT_URI, STRAVA_KV } = c.env;
+  const { STRAVA_CLIENT_ID, STRAVA_CLIENT_SECRET, REDIRECT_URI, STRAVA_KV, ENCRYPTION_KEY } = c.env;
 
   const code = c.req.query('code');
   const error = c.req.query('error');
@@ -30,15 +60,9 @@ authRoutes.get('/callback', async (c) => {
 
   const storedState = await STRAVA_KV.get(`${STATE_KV_PREFIX}${state}`);
   if (!storedState) {
-    return c.html(<ErrorPage message="Invalid or expired state. Please reconnect through Claude." />, 400);
+    return c.html(<ErrorPage message="Invalid or expired state. Please try authenticating again." />, 400);
   }
   await STRAVA_KV.delete(`${STATE_KV_PREFIX}${state}`);
-
-  const pendingRaw = await STRAVA_KV.get(`${MCP_PENDING_PREFIX}${state}`, 'json') as McpPendingRecord | null;
-  if (!pendingRaw) {
-    return c.html(<ErrorPage message="No OAuth session found. Please connect through Claude's MCP settings." />, 400);
-  }
-  await STRAVA_KV.delete(`${MCP_PENDING_PREFIX}${state}`);
 
   const body = new URLSearchParams({
     client_id: STRAVA_CLIENT_ID,
@@ -63,14 +87,17 @@ authRoutes.get('/callback', async (c) => {
   const sessionId = crypto.randomUUID();
   await storeTokens(STRAVA_KV, sessionId, data);
 
-  const authCode = crypto.randomUUID();
-  const codeRecord: McpCodeRecord = { sessionId, codeChallenge: pendingRaw.codeChallenge };
-  await STRAVA_KV.put(`${MCP_CODE_PREFIX}${authCode}`, JSON.stringify(codeRecord), { expirationTtl: CODE_TTL });
+  const encryptedToken = await encryptSessionId(sessionId, ENCRYPTION_KEY);
+  const mcpBase = new URL(REDIRECT_URI);
+  mcpBase.pathname = '/mcp';
+  const connectorUrl = `${mcpBase.origin}/mcp?token=${encryptedToken}`;
 
-  const redirectUrl = new URL(pendingRaw.claudeRedirectUri);
-  redirectUrl.searchParams.set('code', authCode);
-  if (pendingRaw.claudeState) redirectUrl.searchParams.set('state', pendingRaw.claudeState);
-  return c.redirect(redirectUrl.toString());
+  return c.html(
+    <SuccessPage
+      athlete={data.athlete ?? { id: 0, username: '', firstname: 'Athlete', lastname: '' }}
+      connectorUrl={connectorUrl}
+    />
+  );
 });
 
 authRoutes.get('/status', async (c) => {
