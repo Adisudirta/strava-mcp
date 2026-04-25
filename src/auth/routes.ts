@@ -5,11 +5,19 @@ import { storeTokens, getStoredTokens, isTokenExpired } from './token';
 const STRAVA_AUTH_URL = 'https://www.strava.com/oauth/authorize';
 const STRAVA_TOKEN_URL = 'https://www.strava.com/oauth/token';
 const SCOPES = 'read,activity:read_all,profile:read_all';
+const STATE_KV_PREFIX = 'oauth:state:';
+const STATE_TTL_SECONDS = 600; // state nonce expires in 10 minutes
 
 export const authRoutes = new Hono<Env>();
 
-authRoutes.get('/strava', (c) => {
-  const { STRAVA_CLIENT_ID, REDIRECT_URI } = c.env;
+authRoutes.get('/strava', async (c) => {
+  const { STRAVA_CLIENT_ID, REDIRECT_URI, STRAVA_KV } = c.env;
+
+  // Generate a random state nonce to prevent CSRF attacks
+  const state = crypto.randomUUID();
+  await STRAVA_KV.put(`${STATE_KV_PREFIX}${state}`, '1', {
+    expirationTtl: STATE_TTL_SECONDS,
+  });
 
   const params = new URLSearchParams({
     client_id: STRAVA_CLIENT_ID,
@@ -17,6 +25,7 @@ authRoutes.get('/strava', (c) => {
     response_type: 'code',
     approval_prompt: 'auto',
     scope: SCOPES,
+    state,
   });
 
   return c.redirect(`${STRAVA_AUTH_URL}?${params.toString()}`);
@@ -27,6 +36,7 @@ authRoutes.get('/callback', async (c) => {
 
   const code = c.req.query('code');
   const error = c.req.query('error');
+  const state = c.req.query('state');
 
   if (error) {
     return c.json({ error: `Strava authorization denied: ${error}` }, 400);
@@ -35,6 +45,16 @@ authRoutes.get('/callback', async (c) => {
   if (!code) {
     return c.json({ error: 'Missing authorization code' }, 400);
   }
+
+  // Validate the state nonce to prevent CSRF
+  if (!state) {
+    return c.json({ error: 'Missing state parameter' }, 400);
+  }
+  const storedState = await STRAVA_KV.get(`${STATE_KV_PREFIX}${state}`);
+  if (!storedState) {
+    return c.json({ error: 'Invalid or expired state parameter' }, 400);
+  }
+  await STRAVA_KV.delete(`${STATE_KV_PREFIX}${state}`);
 
   const body = new URLSearchParams({
     client_id: STRAVA_CLIENT_ID,
@@ -80,6 +100,11 @@ authRoutes.get('/status', async (c) => {
     expired,
     expires_at: record.expires_at,
     expires_in_seconds: record.expires_at - nowSeconds,
-    athlete: record.athlete,
+    athlete: {
+      id: record.athlete.id,
+      username: record.athlete.username,
+      firstname: record.athlete.firstname,
+      lastname: record.athlete.lastname,
+    },
   });
 });

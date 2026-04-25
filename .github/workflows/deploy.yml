@@ -11,6 +11,12 @@ jobs:
     name: Deploy
     steps:
       - uses: actions/checkout@v4
+
+      - name: Inject environment config
+        run: |
+          sed -i 's|<your-kv-namespace-id>|${{ secrets.KV_NAMESPACE_ID }}|g' wrangler.jsonc
+          sed -i 's|<your-subdomain>|${{ secrets.WORKERS_SUBDOMAIN }}|g' wrangler.jsonc
+
       - name: Deploy
         uses: cloudflare/wrangler-action@v3
         with:
