@@ -1,9 +1,25 @@
-# prod
+# build
 dist/
 
-# dev
-.yarn/
-!.yarn/releases
+# deps
+node_modules/
+
+# env / secrets
+.env
+.env.*
+.dev.vars
+
+# local token storage (never commit OAuth tokens)
+.strava-mcp/
+
+# logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# editors
 .vscode/*
 !.vscode/launch.json
 !.vscode/*.code-snippets
@@ -11,23 +27,5 @@ dist/
 .idea/usage.statistics.xml
 .idea/shelf
 
-# deps
-node_modules/
-.wrangler
-
-# env
-.env
-.env.production
-.dev.vars
-
-# logs
-logs/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-# misc
+# os
 .DS_Store
