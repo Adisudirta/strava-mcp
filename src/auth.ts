@@ -102,9 +102,71 @@ function openBrowser(url: string): void {
 }
 
 function callbackHtml(title: string, body: string): string {
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>${title}</title>
-<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:linear-gradient(135deg,#1a1a2e,#0f3460);min-height:100vh;display:flex;align-items:center;justify-content:center;color:#fff}div{text-align:center;padding:2rem}h1{font-size:1.8rem;margin-bottom:1rem;color:#FC4C02}p{color:#ccc}</style>
-</head><body><div><h1>${title}</h1><p>${body}</p></div></body></html>`;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${title}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.06);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 2.5rem 2rem;
+      max-width: 440px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      color: #fff;
+    }
+    .icon { font-size: 48px; margin-bottom: 1rem; }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      background: linear-gradient(135deg, #FC4C02, #ff6b35);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    p { color: #a0a0b0; font-size: 0.95rem; line-height: 1.6; margin-bottom: 0.5rem; }
+    .footer {
+      margin-top: 2rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 0.8rem;
+      color: #555;
+    }
+    .footer a { color: #FC4C02; text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">🏃</div>
+    <h1>${title}</h1>
+    <p>${body}</p>
+    <div class="footer">
+      Thank you for using Strava MCP &mdash;
+      <a href="https://github.com/Adisudirta/strava-mcp" target="_blank" rel="noopener">
+        open source on GitHub
+      </a>
+    </div>
+  </div>
+</body>
+</html>`;
 }
 
 /**
