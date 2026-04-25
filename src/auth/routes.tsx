@@ -3,11 +3,12 @@ import type { Env, StravaTokenResponse, StravaTokenError } from '../types';
 import { storeTokens, getStoredTokens, isTokenExpired, deleteTokens } from './token';
 import { SuccessPage } from './pages/SuccessPage';
 import { ErrorPage } from './pages/ErrorPage';
+import { MCP_PENDING_PREFIX, MCP_CODE_PREFIX, CODE_TTL, STATE_KV_PREFIX } from './oauth';
+import type { McpPendingRecord, McpCodeRecord } from './oauth';
 
 const STRAVA_AUTH_URL = 'https://www.strava.com/oauth/authorize';
 const STRAVA_TOKEN_URL = 'https://www.strava.com/oauth/token';
 const SCOPES = 'read,activity:read_all,profile:read_all';
-const STATE_KV_PREFIX = 'oauth:state:';
 const STATE_TTL_SECONDS = 600;
 
 export const authRoutes = new Hono<Env>();
@@ -80,6 +81,20 @@ authRoutes.get('/callback', async (c) => {
   const sessionId = crypto.randomUUID();
   await storeTokens(STRAVA_KV, sessionId, data);
 
+  // If this callback is part of an MCP OAuth 2.1 flow, redirect back to the claude.ai client
+  const pendingRaw = await STRAVA_KV.get(`${MCP_PENDING_PREFIX}${state}`, 'json') as McpPendingRecord | null;
+  if (pendingRaw) {
+    await STRAVA_KV.delete(`${MCP_PENDING_PREFIX}${state}`);
+    const authCode = crypto.randomUUID();
+    const codeRecord: McpCodeRecord = { sessionId, codeChallenge: pendingRaw.codeChallenge };
+    await STRAVA_KV.put(`${MCP_CODE_PREFIX}${authCode}`, JSON.stringify(codeRecord), { expirationTtl: CODE_TTL });
+    const redirectUrl = new URL(pendingRaw.claudeRedirectUri);
+    redirectUrl.searchParams.set('code', authCode);
+    if (pendingRaw.claudeState) redirectUrl.searchParams.set('state', pendingRaw.claudeState);
+    return c.redirect(redirectUrl.toString());
+  }
+
+  // Desktop flow: show the session token for manual config
   const mcpUrl = new URL(REDIRECT_URI);
   mcpUrl.pathname = '/mcp';
 
