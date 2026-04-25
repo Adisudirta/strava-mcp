@@ -12,10 +12,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Validate secrets
+        run: |
+          if [ -z "${{ secrets.KV_NAMESPACE_ID }}" ]; then echo "❌ KV_NAMESPACE_ID secret is not set" && exit 1; fi
+          if [ -z "${{ secrets.WORKERS_SUBDOMAIN }}" ]; then echo "❌ WORKERS_SUBDOMAIN secret is not set" && exit 1; fi
+          echo "✅ All secrets present"
+
       - name: Inject environment config
         run: |
           sed -i 's|<your-kv-namespace-id>|${{ secrets.KV_NAMESPACE_ID }}|g' wrangler.jsonc
           sed -i 's|<your-subdomain>|${{ secrets.WORKERS_SUBDOMAIN }}|g' wrangler.jsonc
+          echo "wrangler.jsonc after substitution:"
+          cat wrangler.jsonc
 
       - name: Deploy
         uses: cloudflare/wrangler-action@v3
