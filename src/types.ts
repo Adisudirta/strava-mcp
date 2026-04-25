@@ -1,4 +1,4 @@
-export type Env = { Bindings: CloudflareBindings };
+export type Env = { Bindings: CloudflareBindings & { ENCRYPTION_KEY: string } };
 
 export type StravaAthlete = {
   id: number;

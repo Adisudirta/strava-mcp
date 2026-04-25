@@ -1,33 +1,27 @@
-import { Hono } from 'hono';
-import { cors } from 'hono/cors';
-import type { Env } from './types';
-import { authRoutes } from './auth/routes';
-import { wellKnownRoutes, oauthRoutes } from './auth/oauth';
-import { mcpServer, mcpTransport, setMcpContext } from './mcp/server';
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import type { Env } from "./types";
+import { authRoutes } from "./auth/routes";
+import { decryptSessionId } from "./auth/crypto";
+import { mcpServer, mcpTransport, setMcpContext } from "./mcp/server";
 
 const app = new Hono<Env>();
 
-app.use('*', cors({
-  origin: '*',
-  allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization', 'Mcp-Session-Id'],
-  exposeHeaders: ['WWW-Authenticate', 'Mcp-Session-Id'],
-}));
+app.get("/", (c) => c.redirect("/auth/connect"));
 
-app.get('/', (c) => c.text('Strava MCP Server'));
+app.route("/auth", authRoutes);
 
-app.route('/auth', authRoutes);
-app.route('/.well-known', wellKnownRoutes);
-app.route('/oauth', oauthRoutes);
+app.all("/mcp", async (c) => {
+  const authHeader = c.req.header("Authorization");
+  let sessionId: string | null = null;
 
-app.all('/mcp', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  const sessionId = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
-
-  if (!sessionId) {
-    const origin = new URL(c.req.url).origin;
-    c.header('WWW-Authenticate', `Bearer resource_metadata="${origin}/.well-known/oauth-protected-resource"`);
-    return c.json({ error: 'unauthorized', error_description: 'Authentication required' }, 401);
+  if (authHeader?.startsWith("Bearer ")) {
+    sessionId = authHeader.slice(7);
+  } else {
+    const urlToken = c.req.query("token");
+    if (urlToken) {
+      sessionId = await decryptSessionId(urlToken, c.env.ENCRYPTION_KEY);
+    }
   }
 
   setMcpContext({

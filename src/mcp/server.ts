@@ -22,7 +22,7 @@ export function setMcpContext(context: McpContext) {
 
 const NOT_AUTHENTICATED = {
   isError: true,
-  content: [{ type: 'text' as const, text: 'Not authenticated. Call the get_auth_url tool to get the Strava login URL, then ask the user to open it in their browser.' }],
+  content: [{ type: 'text' as const, text: 'Not authenticated. Call the check_strava_connection tool to get the Strava login URL, then ask the user to open it in their browser.' }],
 };
 
 async function requireToken(): Promise<string | null> {
@@ -64,9 +64,10 @@ mcpServer.registerTool(
         content: [{ type: 'text', text: `Connected to Strava as ${name}. You can now use Strava tools.` }],
       };
     }
+    const authUrl = ctx?.redirectUri.replace('/auth/callback', '/auth/connect') ?? '/auth/connect';
     return {
       isError: true,
-      content: [{ type: 'text', text: 'Not connected to Strava. Please reconnect this MCP server in Claude\'s settings to start the Strava login flow.' }],
+      content: [{ type: 'text', text: `Not connected to Strava. Ask the user to open this URL in their browser to authenticate:\n\n${authUrl}` }],
     };
   }
 );
@@ -81,7 +82,7 @@ mcpServer.registerTool(
     if (!ctx?.sessionId) return NOT_AUTHENTICATED;
     await deleteTokens(ctx.kv, ctx.sessionId);
     return {
-      content: [{ type: 'text', text: 'You have been logged out. Call get_auth_url to reconnect your Strava account.' }],
+      content: [{ type: 'text', text: 'You have been logged out. Call check_strava_connection to reconnect your Strava account.' }],
     };
   }
 );
