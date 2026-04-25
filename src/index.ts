@@ -1,9 +1,11 @@
-import { Hono } from 'hono'
+import { Hono } from 'hono';
+import type { Env } from './types';
+import { authRoutes } from './auth/routes';
 
-const app = new Hono()
+const app = new Hono<Env>();
 
-app.get('/', (c) => {
-  return c.text('Hello Hono!')
-})
+app.get('/', (c) => c.text('Strava MCP Server'));
 
-export default app
+app.route('/auth', authRoutes);
+
+export default app;
