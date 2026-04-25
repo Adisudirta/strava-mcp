@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { Env, StravaTokenResponse, StravaTokenError } from '../types';
-import { storeTokens, getStoredTokens, isTokenExpired } from './token';
+import { storeTokens, getStoredTokens, isTokenExpired, deleteTokens } from './token';
 import { SuccessPage } from './pages/SuccessPage';
 import { ErrorPage } from './pages/ErrorPage';
 
@@ -77,18 +77,33 @@ authRoutes.get('/callback', async (c) => {
   }
 
   const data = (await tokenResponse.json()) as StravaTokenResponse;
-  await storeTokens(STRAVA_KV, data);
+  const sessionId = crypto.randomUUID();
+  await storeTokens(STRAVA_KV, sessionId, data);
+
+  const mcpUrl = new URL(REDIRECT_URI);
+  mcpUrl.pathname = '/mcp';
 
   return c.html(
-    <SuccessPage athlete={data.athlete ?? { id: 0, username: '', firstname: 'Athlete', lastname: '' }} />
+    <SuccessPage
+      athlete={data.athlete ?? { id: 0, username: '', firstname: 'Athlete', lastname: '' }}
+      sessionToken={sessionId}
+      mcpUrl={mcpUrl.toString()}
+    />
   );
 });
 
 authRoutes.get('/status', async (c) => {
-  const record = await getStoredTokens(c.env.STRAVA_KV);
+  const authHeader = c.req.header('Authorization');
+  const sessionId = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+
+  if (!sessionId) {
+    return c.json({ authenticated: false, reason: 'No session token provided' });
+  }
+
+  const record = await getStoredTokens(c.env.STRAVA_KV, sessionId);
 
   if (!record) {
-    return c.json({ authenticated: false, reason: 'No tokens stored' });
+    return c.json({ authenticated: false, reason: 'Session not found' });
   }
 
   const nowSeconds = Math.floor(Date.now() / 1000);
@@ -106,4 +121,16 @@ authRoutes.get('/status', async (c) => {
       lastname: record.athlete.lastname,
     },
   });
+});
+
+authRoutes.delete('/revoke', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  const sessionId = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+
+  if (!sessionId) {
+    return c.json({ error: 'No session token provided' }, 400);
+  }
+
+  await deleteTokens(c.env.STRAVA_KV, sessionId);
+  return c.json({ success: true });
 });
