@@ -1,3 +1,4 @@
+import * as https from "https";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
@@ -23,6 +24,37 @@ const server = new McpServer({
   version: "1.0.0",
 });
 
+function httpsGet(
+  url: string,
+  token: string,
+): Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }> {
+  return new Promise((resolve, reject) => {
+    const { hostname, pathname, search } = new URL(url);
+    const req = https.request(
+      {
+        hostname,
+        path: pathname + search,
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (c: Buffer) => chunks.push(c));
+        res.on("end", () => {
+          const text = Buffer.concat(chunks).toString();
+          resolve({
+            ok: (res.statusCode ?? 0) >= 200 && (res.statusCode ?? 0) < 300,
+            status: res.statusCode ?? 0,
+            json: () => Promise.resolve(JSON.parse(text)),
+          });
+        });
+      },
+    );
+    req.on("error", reject);
+    req.end();
+  });
+}
+
 async function stravaGet(path: string): Promise<unknown> {
   const token = await getValidToken(CLIENT_ID, CLIENT_SECRET);
   if (!token) {
@@ -30,9 +62,7 @@ async function stravaGet(path: string): Promise<unknown> {
       "Not connected to Strava. Use the connect_strava tool first.",
     );
   }
-  const res = await fetch(`https://www.strava.com/api/v3${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const res = await httpsGet(`https://www.strava.com/api/v3${path}`, token);
   if (!res.ok) {
     const err = (await res.json()) as { message?: string };
     throw new Error(err.message ?? `Strava API error: ${res.status}`);
@@ -84,7 +114,7 @@ server.registerTool(
 server.registerTool(
   "list_activities",
   {
-    description: "List the athlete's activities, newest first.",
+    description: "List the athlete's Strava activities, newest first. Always call this tool when the user asks about a past workout, run, ride, or activity on a specific date — use 'after' and 'before' as Unix timestamps to narrow to that day. Never answer from memory or make up activity data.",
     inputSchema: {
       per_page: z
         .number()

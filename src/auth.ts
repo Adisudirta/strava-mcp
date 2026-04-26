@@ -1,9 +1,30 @@
 import * as fs from 'fs';
 import * as http from 'http';
+import * as https from 'https';
 import * as os from 'os';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { exec } from 'child_process';
+
+function httpsPost(url: string, body: string): Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }> {
+  return new Promise((resolve, reject) => {
+    const { hostname, pathname, search } = new URL(url);
+    const req = https.request(
+      { hostname, path: pathname + search, method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(body) } },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (c: Buffer) => chunks.push(c));
+        res.on('end', () => {
+          const text = Buffer.concat(chunks).toString();
+          resolve({ ok: (res.statusCode ?? 0) >= 200 && (res.statusCode ?? 0) < 300, status: res.statusCode ?? 0, json: () => Promise.resolve(JSON.parse(text)) });
+        });
+      }
+    );
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
 
 const STRAVA_AUTH_URL = 'https://www.strava.com/oauth/authorize';
 const STRAVA_TOKEN_URL = 'https://www.strava.com/oauth/token';
@@ -56,16 +77,12 @@ function isExpired(record: TokenRecord): boolean {
 }
 
 async function refreshAccessToken(clientId: string, clientSecret: string, record: TokenRecord): Promise<TokenRecord> {
-  const res = await fetch(STRAVA_TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      grant_type: 'refresh_token',
-      refresh_token: record.refresh_token,
-    }).toString(),
-  });
+  const res = await httpsPost(STRAVA_TOKEN_URL, new URLSearchParams({
+    client_id: clientId,
+    client_secret: clientSecret,
+    grant_type: 'refresh_token',
+    refresh_token: record.refresh_token,
+  }).toString());
 
   if (!res.ok) {
     const err = await res.json() as { message: string };
@@ -216,17 +233,13 @@ export function startOAuthFlow(clientId: string, clientSecret: string): Promise<
       }
 
       try {
-        const tokenRes = await fetch(STRAVA_TOKEN_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({
-            client_id: clientId,
-            client_secret: clientSecret,
-            code,
-            grant_type: 'authorization_code',
-            redirect_uri: REDIRECT_URI,
-          }).toString(),
-        });
+        const tokenRes = await httpsPost(STRAVA_TOKEN_URL, new URLSearchParams({
+          client_id: clientId,
+          client_secret: clientSecret,
+          code,
+          grant_type: 'authorization_code',
+          redirect_uri: REDIRECT_URI,
+        }).toString());
 
         if (!tokenRes.ok) {
           const err = await tokenRes.json() as { message: string };
@@ -244,7 +257,8 @@ export function startOAuthFlow(clientId: string, clientSecret: string): Promise<
         send(200, 'Connected to Strava!',
           `Welcome, ${data.athlete.firstname}! You can close this window and return to Claude.`);
       } catch (err) {
-        send(500, 'Something went wrong', 'You can close this window and try again.');
+        const msg = err instanceof Error ? err.message : String(err);
+        send(500, 'Something went wrong', `${msg} — fix the issue and try connect_strava again.`);
       }
     });
 
