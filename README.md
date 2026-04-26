@@ -67,14 +67,14 @@ In Claude, ask it to call the `connect_strava` tool. A browser window will open 
 
 ## Available tools
 
-| Tool | Description |
-|------|-------------|
-| `connect_strava` | Authorize with Strava via OAuth (run this first) |
-| `disconnect_strava` | Remove stored tokens |
-| `get_athlete` | Get your full athlete profile |
-| `list_activities` | List your activities (supports pagination and date filters) |
-| `get_activity` | Get details of a specific activity by ID |
-| `get_athlete_stats` | Get all-time and recent totals for runs, rides, and swims |
+| Tool                | Description                                                 |
+| ------------------- | ----------------------------------------------------------- |
+| `connect_strava`    | Authorize with Strava via OAuth (run this first)            |
+| `disconnect_strava` | Remove stored tokens                                        |
+| `get_athlete`       | Get your full athlete profile                               |
+| `list_activities`   | List your activities (supports pagination and date filters) |
+| `get_activity`      | Get details of a specific activity by ID                    |
+| `get_athlete_stats` | Get all-time and recent totals for runs, rides, and swims   |
 
 ---
 
@@ -85,17 +85,3 @@ npm run dev
 ```
 
 Runs the server directly with `tsx` (no build step needed).
-
----
-
-## Security
-
-- **OAuth CSRF protection**: each authorization request generates a random `state` nonce, verified on callback before exchanging the code.
-- **Token storage**: tokens are saved to `~/.strava-mcp/tokens.json` with file permissions set to owner-read-only (`0600`). This file is outside the project directory and is never committed.
-- **Credentials**: `STRAVA_CLIENT_ID` and `STRAVA_CLIENT_SECRET` are passed as environment variables via the Claude Desktop config — they are never written to disk by this server.
-
----
-
-## License
-
-MIT
